@@ -257,7 +257,7 @@ if not st.session_state.game_over:
 
     if skip and not st.session_state.show_result:
         pick_new_review(df)
-        st.experimental_rerun()
+        st.rerun()
 
     # 3. AI predicts sentiment + 4. Reveal true sentiment + 5. Award points
     if submit and not st.session_state.show_result:
@@ -351,7 +351,7 @@ if not st.session_state.game_over:
             else:
                 st.session_state.round += 1
                 pick_new_review(df)
-            st.experimental_rerun()
+            st.rerun()
 
 # -------------------- GAME OVER SCREEN -------------------- #
 
@@ -380,7 +380,7 @@ if st.session_state.game_over:
     if st.button("Play Again 🔁", use_container_width=True):
         init_game(default_rounds)
         pick_new_review(df)
-        st.experimental_rerun()
+        st.rerun()
 
 # -------------------- HISTORY (OPTIONAL ANALYTICS) -------------------- #
 
