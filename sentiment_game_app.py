@@ -1,8 +1,27 @@
 import random
+import time
 
 import pandas as pd
 import streamlit as st
 from textblob import TextBlob
+
+# -------------------- CONFIG -------------------- #
+QUESTION_TIME_LIMIT = 20  # seconds per question
+
+# Happy & sad GIF pools
+HAPPY_GIFS = [
+    "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",  # confetti
+    "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",   # happy dance
+    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",  # victory
+    "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",   # excited
+]
+
+SAD_GIFS = [
+    "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",   # sad dog
+    "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",   # crying panda
+    "https://media.giphy.com/media/RHZ8QdsAFZRug/giphy.gif",   # disappointed
+    "https://media.giphy.com/media/3og0IPxMM0erATueVW/giphy.gif",  # facepalm
+]
 
 # -------------------- PAGE CONFIG & STYLE -------------------- #
 st.set_page_config(
@@ -64,6 +83,19 @@ st.markdown(
         font-weight: 750;
         text-align: center;
     }
+    @keyframes dance {
+        0%   {transform: translateY(0) rotate(0deg);}
+        25%  {transform: translateY(-6px) rotate(-6deg);}
+        50%  {transform: translateY(0) rotate(0deg);}
+        75%  {transform: translateY(-6px) rotate(6deg);}
+        100% {transform: translateY(0) rotate(0deg);}
+    }
+    .dancing-bot {
+        font-size: 2.8rem;
+        display: inline-block;
+        animation: dance 0.9s infinite;
+        margin-bottom: 0.3rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -116,10 +148,12 @@ def pick_new_review():
     st.session_state.human_guess = None
     st.session_state.ai_guess = None
     st.session_state.ai_confidence = None
+    st.session_state.round_start_time = time.time()
+    st.session_state.time_up = False
 
 
 def init_game(total_rounds: int):
-    """Initialize a new game: scores, round, history, phase."""
+    """Initialize a new game: scores, round, history, phase, timer."""
     st.session_state.round = 1
     st.session_state.total_rounds = total_rounds
     st.session_state.human_score = 0
@@ -132,10 +166,11 @@ def init_game(total_rounds: int):
     st.session_state.ai_guess = None
     st.session_state.ai_confidence = None
     st.session_state.phase = "game"  # now we're in game phase
+    st.session_state.time_limit = QUESTION_TIME_LIMIT
     pick_new_review()
 
 
-# -------------------- INITIAL HEADER -------------------- #
+# -------------------- HEADER -------------------- #
 
 st.markdown(
     "<div class='main-title'>Sentiment Guessing Game 🤖🆚🧠</div>",
@@ -143,10 +178,18 @@ st.markdown(
 )
 st.markdown(
     "<div class='subtitle'>An AI bot host will quiz you on real reviews. "
-    "Upload a dataset and see if you can beat the machine!</div>",
+    "Upload a dataset, beat the timer, and try to outsmart the machine!</div>",
     unsafe_allow_html=True,
 )
 st.write("")
+
+# Dancing bot always visible at top to grab attention
+st.markdown(
+    "<div style='text-align:center; margin-bottom: 0.6rem;'>"
+    "<span class='dancing-bot'>🤖</span>"
+    "</div>",
+    unsafe_allow_html=True,
+)
 
 # Initialize phase
 if "phase" not in st.session_state:
@@ -155,12 +198,16 @@ if "phase" not in st.session_state:
 # -------------------- PHASE 1: SETUP (AI bot asks to upload CSV) -------------------- #
 
 if st.session_state.phase == "setup":
-    # AI bot greeting
+    fun_lines = [
+        "I'm all charged up and ready to roast your predictions 😏",
+        "Feed me a CSV and I'll feed you tricky questions 🤓",
+        "Today we find out... are *you* smarter than an AI? 👀",
+    ]
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        "🤖 <b>AI Bot:</b> Hey there! I'm your Sentiment Quiz Bot. "
-        "To start the game, please upload a CSV file with customer reviews.<br>"
-        "<br><b>Required columns:</b> <code>review</code> and <code>sentiment</code> "
+        f"🤖 <b>AI Bot:</b> Hey! I'm your Sentiment Quiz Bot.<br>{random.choice(fun_lines)}"
+        "<br><br>First, upload a CSV file with customer reviews.<br>"
+        "<b>Required columns:</b> <code>review</code> and <code>sentiment</code> "
         "(e.g., positive / negative / neutral)."
         "</div>",
         unsafe_allow_html=True,
@@ -173,7 +220,7 @@ if st.session_state.phase == "setup":
 
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        "🤖 <b>AI Bot:</b> Also, how many questions do you want me to ask you?"
+        "🤖 <b>AI Bot:</b> And how many questions do you want me to throw at you?"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -192,7 +239,7 @@ if st.session_state.phase == "setup":
         if uploaded_file is None:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Oops! I can't see any file yet 😅 "
+                "🤖 <b>AI Bot:</b> Oops! I don't see a file yet 😅 "
                 "Please upload a CSV so I can read the reviews."
                 "</div>",
                 unsafe_allow_html=True,
@@ -252,13 +299,14 @@ with col_score2:
     st.metric("🤖 AI Score", st.session_state.ai_score)
 with col_score3:
     st.metric(
-        "🧠 Human & AI Agreement",
+        "🧠 Agreement",
         st.session_state.agreement,
-        help="Number of rounds where you and the AI picked the same sentiment.",
+        help="Rounds where you and the AI picked the same sentiment.",
     )
 
-progress = st.session_state.round / st.session_state.total_rounds
-st.progress(progress, text=f"Round {st.session_state.round} of {st.session_state.total_rounds}")
+# Overall game progress (rounds)
+game_progress = st.session_state.round / st.session_state.total_rounds
+st.progress(game_progress, text=f"Game Progress: Round {st.session_state.round} of {st.session_state.total_rounds}")
 
 st.write("")
 
@@ -266,13 +314,71 @@ st.write("")
 
 if not st.session_state.game_over:
 
+    # TIMER LOGIC
+    if "time_limit" not in st.session_state:
+        st.session_state.time_limit = QUESTION_TIME_LIMIT
+    if "round_start_time" not in st.session_state:
+        st.session_state.round_start_time = time.time()
+    if "time_up" not in st.session_state:
+        st.session_state.time_up = False
+
+    elapsed = time.time() - st.session_state.round_start_time
+    remaining = max(0, int(st.session_state.time_limit - elapsed))
+    if st.session_state.time_limit > 0:
+        timer_ratio = max(0.0, min(1.0, remaining / st.session_state.time_limit))
+    else:
+        timer_ratio = 0.0
+
+    timer_col1, timer_col2 = st.columns([3, 1])
+    with timer_col1:
+        st.progress(timer_ratio, text=f"⏳ Time left for this question: {remaining} seconds")
+    with timer_col2:
+        st.metric("⏱️ Time", f"{remaining}s")
+
+    # If time is up and no result yet -> AI auto reveals
+    if remaining == 0 and not st.session_state.show_result and not st.session_state.time_up:
+        st.session_state.time_up = True
+        st.session_state.human_guess = "⏰ Time Up (No Answer)"
+
+        # AI prediction
+        ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
+        st.session_state.ai_guess = ai_label
+        st.session_state.ai_confidence = ai_conf
+
+        truth = st.session_state.current_truth
+        ai_correct = ai_label == truth
+
+        if ai_correct:
+            st.session_state.ai_score += 1
+
+        # agreement (only if AI also "no answer"? here: no)
+        st.session_state.history.append(
+            {
+                "round": st.session_state.round,
+                "review": st.session_state.current_review,
+                "truth": truth,
+                "human": st.session_state.human_guess,
+                "ai": st.session_state.ai_guess,
+                "ai_conf": st.session_state.ai_confidence,
+            }
+        )
+
+        st.session_state.show_result = True
+
     st.markdown("### 💬 AI Bot Chat")
 
-    # Bot introduces the question
+    # Fun dynamic line each round
+    fun_round_lines = [
+        "Let's see if your brain can beat my circuits this time 😏",
+        "Don't overthink it... or do. I love watching humans think 🤖",
+        "This one has some spice 🌶️, be careful!",
+        "Is this review happy, meh, or mad? You tell me 😄",
+    ]
     st.markdown(
         "<div class='chat-bubble-bot'>"
         f"🤖 <b>AI Bot:</b> Okay, Round <b>{st.session_state.round}</b>! "
-        "Read this review carefully and tell me its sentiment 👇"
+        f"{random.choice(fun_round_lines)}<br>"
+        "Read this review carefully 👇"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -284,11 +390,11 @@ if not st.session_state.game_over:
     )
 
     # If we haven't shown result yet, ask for answer
-    if not st.session_state.show_result:
+    if not st.session_state.show_result and not st.session_state.time_up:
         st.markdown(
             "<div class='chat-bubble-bot'>"
-            "🤖 <b>AI Bot:</b> What do you think this review feels like?"
-            " Click one of the options below:"
+            "🤖 <b>AI Bot:</b> What do you think this review feels like? "
+            "Click one of the options below:"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -297,13 +403,13 @@ if not st.session_state.game_over:
         human_choice = None
 
         with col_p:
-            if st.button("😄 Positive", use_container_width=True):
+            if st.button("😄 Positive", use_container_width=True, key=f"btn_pos_{st.session_state.round}"):
                 human_choice = "Positive"
         with col_nu:
-            if st.button("😐 Neutral", use_container_width=True):
+            if st.button("😐 Neutral", use_container_width=True, key=f"btn_neu_{st.session_state.round}"):
                 human_choice = "Neutral"
         with col_ne:
-            if st.button("☹️ Negative", use_container_width=True):
+            if st.button("☹️ Negative", use_container_width=True, key=f"btn_neg_{st.session_state.round}"):
                 human_choice = "Negative"
 
         if human_choice is not None:
@@ -343,7 +449,7 @@ if not st.session_state.game_over:
             if human_correct and not ai_correct:
                 st.balloons()
 
-    # -------------------- SHOW RESULT AFTER CHOICE -------------------- #
+    # -------------------- SHOW RESULT AFTER CHOICE / TIME UP -------------------- #
 
     if st.session_state.show_result:
         truth = st.session_state.current_truth
@@ -364,7 +470,7 @@ if not st.session_state.game_over:
             if human == truth:
                 st.success(f"{human} (Correct!) 🎉")
             else:
-                st.error(f"{human} (Incorrect) 😅")
+                st.error(f"{human} (Incorrect or Time Up) 😅")
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_res2:
@@ -390,20 +496,21 @@ if not st.session_state.game_over:
                 unsafe_allow_html=True,
             )
             st.image(
-                "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+                random.choice(HAPPY_GIFS),
                 caption="AI Bot is super happy with your answer!",
                 use_container_width=False,
             )
         else:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Aww, not this time 😢 But don't worry, "
-                "we'll nail the next one!"
+                "🤖 <b>AI Bot:</b> Aww, not this time 😢 "
+                "Either you missed it or the timer got you. "
+                "But don't worry, the next one is yours!"
                 "</div>",
                 unsafe_allow_html=True,
             )
             st.image(
-                "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",
+                random.choice(SAD_GIFS),
                 caption="AI Bot is a little sad this round.",
                 use_container_width=False,
             )
@@ -487,11 +594,14 @@ if st.session_state.game_over:
     if st.button("Play Again 🔁", use_container_width=True):
         # Go back to setup so bot again asks for CSV & rounds from beginning
         st.session_state.phase = "setup"
-        for key in ["df", "round", "total_rounds", "human_score", "ai_score",
-                    "agreement", "history", "game_over",
-                    "show_result", "human_guess", "ai_guess",
-                    "ai_confidence", "current_index",
-                    "current_review", "current_truth"]:
+        for key in [
+            "df", "round", "total_rounds", "human_score", "ai_score",
+            "agreement", "history", "game_over",
+            "show_result", "human_guess", "ai_guess",
+            "ai_confidence", "current_index",
+            "current_review", "current_truth",
+            "round_start_time", "time_up",
+        ]:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
