@@ -584,6 +584,7 @@ if st.session_state.game_over:
     )
     st.write("")
 
+    # 🎉 Winner dance GIFs reusing working pools
     if human > ai_score:
         st.markdown(
             "<div class='chat-bubble-human'>"
@@ -592,8 +593,8 @@ if st.session_state.game_over:
             unsafe_allow_html=True,
         )
         st.image(
-            "https://media.giphy.com/media/l41lUJX6ts7fj5Sbm/giphy.gif",
-            caption="Human dances in celebration!",
+            random.choice(HAPPY_GIFS),
+            caption="Human dances in celebration! 🎉",
             use_container_width=False,
         )
     elif human < ai_score:
@@ -604,8 +605,8 @@ if st.session_state.game_over:
             unsafe_allow_html=True,
         )
         st.image(
-            "https://media.giphy.com/media/26BoCVdjSJOWg6hbi/giphy.gif",
-            caption="AI Guess Bot is dancing in victory!",
+            random.choice(HAPPY_GIFS),
+            caption="AI Guess Bot is dancing in victory! 🤖💃",
             use_container_width=False,
         )
     else:
@@ -616,14 +617,14 @@ if st.session_state.game_over:
             unsafe_allow_html=True,
         )
         st.image(
-            "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
-            caption="Human and AI dancing together!",
+            random.choice(HAPPY_GIFS),
+            caption="Human and AI dancing together! 🕺🤖",
             use_container_width=False,
         )
 
     st.write("")
     if st.button("Play Again 🔁", use_container_width=True):
-        # Reset everything and go back to intro (so bot asks again from beginning)
+        # Reset everything and go back to intro
         keys_to_clear = [
             "df", "round", "total_rounds", "human_score", "ai_score",
             "agreement", "history", "game_over",
