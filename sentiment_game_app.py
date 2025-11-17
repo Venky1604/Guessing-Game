@@ -5,25 +5,24 @@ import pandas as pd
 import streamlit as st
 from textblob import TextBlob
 
-# -------------------- CONFIG -------------------- #
+# ================== CONFIG ================== #
 QUESTION_TIME_LIMIT = 20  # seconds per question
 
-# Happy & sad GIF pools
 HAPPY_GIFS = [
-    "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",  # confetti
-    "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",   # happy dance
-    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",  # victory
-    "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",   # excited
+    "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+    "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",
+    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+    "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",
 ]
 
 SAD_GIFS = [
-    "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",   # sad dog
-    "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",   # crying panda
-    "https://media.giphy.com/media/RHZ8QdsAFZRug/giphy.gif",   # disappointed
-    "https://media.giphy.com/media/3og0IPxMM0erATueVW/giphy.gif",  # facepalm
+    "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",
+    "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",
+    "https://media.giphy.com/media/RHZ8QdsAFZRug/giphy.gif",
+    "https://media.giphy.com/media/3og0IPxMM0erATueVW/giphy.gif",
 ]
 
-# -------------------- PAGE CONFIG & STYLE -------------------- #
+# ================== PAGE CONFIG & CSS ================== #
 st.set_page_config(
     page_title="Sentiment Guessing Game 🎮",
     layout="wide",
@@ -83,17 +82,17 @@ st.markdown(
         font-weight: 750;
         text-align: center;
     }
-    @keyframes dance {
+    @keyframes nod {
         0%   {transform: translateY(0) rotate(0deg);}
-        25%  {transform: translateY(-6px) rotate(-6deg);}
+        25%  {transform: translateY(-4px) rotate(-5deg);}
         50%  {transform: translateY(0) rotate(0deg);}
-        75%  {transform: translateY(-6px) rotate(6deg);}
+        75%  {transform: translateY(-4px) rotate(5deg);}
         100% {transform: translateY(0) rotate(0deg);}
     }
-    .dancing-bot {
-        font-size: 2.8rem;
+    .nodding-bot {
+        font-size: 3rem;
         display: inline-block;
-        animation: dance 0.9s infinite;
+        animation: nod 1.2s infinite;
         margin-bottom: 0.3rem;
     }
     </style>
@@ -101,7 +100,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# -------------------- HELPER FUNCTIONS -------------------- #
+# ================== HELPER FUNCTIONS ================== #
 
 def normalize_label(label: str) -> str:
     """Normalize various label formats into 'Positive'/'Negative'/'Neutral'."""
@@ -170,45 +169,77 @@ def init_game(total_rounds: int):
     pick_new_review()
 
 
-# -------------------- HEADER -------------------- #
+# ================== HEADER ================== #
 
 st.markdown(
     "<div class='main-title'>Sentiment Guessing Game 🤖🆚🧠</div>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<div class='subtitle'>An AI bot host will quiz you on real reviews. "
-    "Upload a dataset, beat the timer, and try to outsmart the machine!</div>",
+    "<div class='subtitle'>AI Guess Bot will ask you questions, one review at a time. "
+    "Are you ready to play?</div>",
     unsafe_allow_html=True,
 )
 st.write("")
 
-# Dancing bot always visible at top to grab attention
+# Nodding AI bot always visible
 st.markdown(
     "<div style='text-align:center; margin-bottom: 0.6rem;'>"
-    "<span class='dancing-bot'>🤖</span>"
+    "<span class='nodding-bot'>🤖</span>"
     "</div>",
     unsafe_allow_html=True,
 )
 
-# Initialize phase
+# ================== PHASE MANAGEMENT ================== #
+
 if "phase" not in st.session_state:
-    st.session_state.phase = "setup"
+    st.session_state.phase = "intro"   # intro -> upload -> game
 
-# -------------------- PHASE 1: SETUP (AI bot asks to upload CSV) -------------------- #
+# ---------- PHASE 1: INTRO (Are you ready? Yes/No) ---------- #
 
-if st.session_state.phase == "setup":
-    fun_lines = [
-        "I'm all charged up and ready to roast your predictions 😏",
-        "Feed me a CSV and I'll feed you tricky questions 🤓",
-        "Today we find out... are *you* smarter than an AI? 👀",
-    ]
+if st.session_state.phase == "intro":
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        f"🤖 <b>AI Bot:</b> Hey! I'm your Sentiment Quiz Bot.<br>{random.choice(fun_lines)}"
-        "<br><br>First, upload a CSV file with customer reviews.<br>"
-        "<b>Required columns:</b> <code>review</code> and <code>sentiment</code> "
-        "(e.g., positive / negative / neutral)."
+        "🤖 <b>AI Guess Bot:</b> Hey! I'm the <b>AI Guess Bot</b>, and I'm happy to see you here 😊<br>"
+        "Are you ready to start the game?"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    ready_option = st.selectbox(
+        "Please select an option:",
+        ["Select...", "Yes, let's start!", "No, not yet"],
+    )
+
+    if ready_option == "Yes, let's start!":
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Guess Bot:</b> Awesome! Let's get things ready 🎉<br>"
+            "First, I need your reviews dataset so I can start asking questions."
+            "</div>",
+            unsafe_allow_html=True,
+    )
+        st.session_state.phase = "upload"
+        st.rerun()
+
+    elif ready_option == "No, not yet":
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Guess Bot:</b> No worries! I'll be nodding here until you're ready 😄<br>"
+            "Just pick <b>Yes, let's start!</b> when you're ready to play."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.stop()
+
+# ---------- PHASE 2: UPLOAD (Ask for CSV, rounds, then start) ---------- #
+
+if st.session_state.phase == "upload":
+    st.markdown(
+        "<div class='chat-bubble-bot'>"
+        "🤖 <b>AI Guess Bot:</b> Can you upload the <b>reviews dataset</b> to start the game?<br>"
+        "I need a CSV file with columns <code>review</code> and <code>sentiment</code>."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -220,7 +251,7 @@ if st.session_state.phase == "setup":
 
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        "🤖 <b>AI Bot:</b> And how many questions do you want me to throw at you?"
+        "🤖 <b>AI Guess Bot:</b> And how many questions do you want me to ask you?"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -233,13 +264,13 @@ if st.session_state.phase == "setup":
         step=5,
     )
 
-    start = st.button("🚀 Start Game with this file", use_container_width=True)
+    start = st.button("✅ Upload & Start Game", use_container_width=True)
 
     if start:
         if uploaded_file is None:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Oops! I don't see a file yet 😅 "
+                "🤖 <b>AI Guess Bot:</b> Oops! I can't see any file yet 😅<br>"
                 "Please upload a CSV so I can read the reviews."
                 "</div>",
                 unsafe_allow_html=True,
@@ -250,7 +281,7 @@ if st.session_state.phase == "setup":
         except Exception as e:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                f"🤖 <b>AI Bot:</b> I tried to read the file but ran into an error: "
+                f"🤖 <b>AI Guess Bot:</b> I tried to read the file but got an error: "
                 f"<code>{e}</code><br>"
                 "Can you check the file and try again?"
                 "</div>",
@@ -261,9 +292,9 @@ if st.session_state.phase == "setup":
         if "review" not in df.columns or "sentiment" not in df.columns:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Hmmm... your file is missing the required "
+                "🤖 <b>AI Guess Bot:</b> Hmmm... your file is missing "
                 "<code>review</code> and/or <code>sentiment</code> columns 😢<br>"
-                "Please fix the columns and upload again."
+                "Please fix it and upload again."
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -273,25 +304,34 @@ if st.session_state.phase == "setup":
         if df.empty:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> After cleaning, I found no valid rows in your file. "
-                "Please try with another dataset."
+                "🤖 <b>AI Guess Bot:</b> After cleaning, I found no valid rows. "
+                "Please try another dataset."
                 "</div>",
                 unsafe_allow_html=True,
             )
             st.stop()
 
-        # Store df and start game
+        # Bot nods that we're ready
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Guess Bot:</b> Nice! Your dataset looks good. "
+            "We are <b>ready to start the game</b> now! 🚀"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Save and move to game
         st.session_state.df = df
         init_game(rounds)
         st.rerun()
 
-    st.stop()  # stop here in setup phase
+    st.stop()
 
-# -------------------- FROM HERE: WE ARE IN GAME PHASE -------------------- #
+# ---------- FROM HERE: GAME PHASE ---------- #
 
-df = st.session_state.df  # loaded in setup
+df = st.session_state.df
 
-# Scoreboard on top
+# Scoreboard
 col_score1, col_score2, col_score3 = st.columns(3)
 with col_score1:
     st.metric("👤 Human Score", st.session_state.human_score)
@@ -304,17 +344,16 @@ with col_score3:
         help="Rounds where you and the AI picked the same sentiment.",
     )
 
-# Overall game progress (rounds)
+# Game progress
 game_progress = st.session_state.round / st.session_state.total_rounds
 st.progress(game_progress, text=f"Game Progress: Round {st.session_state.round} of {st.session_state.total_rounds}")
-
 st.write("")
 
-# -------------------- PHASE 2: GAME LOOP -------------------- #
+# ---------- GAME LOOP ---------- #
 
 if not st.session_state.game_over:
 
-    # TIMER LOGIC
+    # TIMER
     if "time_limit" not in st.session_state:
         st.session_state.time_limit = QUESTION_TIME_LIMIT
     if "round_start_time" not in st.session_state:
@@ -335,23 +374,19 @@ if not st.session_state.game_over:
     with timer_col2:
         st.metric("⏱️ Time", f"{remaining}s")
 
-    # If time is up and no result yet -> AI auto reveals
+    # Time up auto-reveal
     if remaining == 0 and not st.session_state.show_result and not st.session_state.time_up:
         st.session_state.time_up = True
         st.session_state.human_guess = "⏰ Time Up (No Answer)"
 
-        # AI prediction
         ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
         st.session_state.ai_guess = ai_label
         st.session_state.ai_confidence = ai_conf
 
         truth = st.session_state.current_truth
-        ai_correct = ai_label == truth
-
-        if ai_correct:
+        if ai_label == truth:
             st.session_state.ai_score += 1
 
-        # agreement (only if AI also "no answer"? here: no)
         st.session_state.history.append(
             {
                 "round": st.session_state.round,
@@ -365,9 +400,9 @@ if not st.session_state.game_over:
 
         st.session_state.show_result = True
 
-    st.markdown("### 💬 AI Bot Chat")
+    # Bot asks the question
+    st.markdown("### 💬 AI Guess Bot")
 
-    # Fun dynamic line each round
     fun_round_lines = [
         "Let's see if your brain can beat my circuits this time 😏",
         "Don't overthink it... or do. I love watching humans think 🤖",
@@ -376,25 +411,24 @@ if not st.session_state.game_over:
     ]
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        f"🤖 <b>AI Bot:</b> Okay, Round <b>{st.session_state.round}</b>! "
+        f"🤖 <b>AI Guess Bot:</b> Round <b>{st.session_state.round}</b>! "
         f"{random.choice(fun_round_lines)}<br>"
         "Read this review carefully 👇"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # Show review
     st.markdown(
         f"<div class='review-card'>“{st.session_state.current_review}”</div>",
         unsafe_allow_html=True,
     )
 
-    # If we haven't shown result yet, ask for answer
+    # Let user answer
     if not st.session_state.show_result and not st.session_state.time_up:
         st.markdown(
             "<div class='chat-bubble-bot'>"
-            "🤖 <b>AI Bot:</b> What do you think this review feels like? "
-            "Click one of the options below:"
+            "🤖 <b>AI Guess Bot:</b> What do you think this review feels like? "
+            "Choose one option:"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -415,7 +449,6 @@ if not st.session_state.game_over:
         if human_choice is not None:
             st.session_state.human_guess = human_choice
 
-            # AI prediction
             ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
             st.session_state.ai_guess = ai_label
             st.session_state.ai_confidence = ai_conf
@@ -445,11 +478,10 @@ if not st.session_state.game_over:
 
             st.session_state.show_result = True
 
-            # Fun balloons when human correct and AI wrong
             if human_correct and not ai_correct:
                 st.balloons()
 
-    # -------------------- SHOW RESULT AFTER CHOICE / TIME UP -------------------- #
+    # ---------- SHOW RESULT ---------- #
 
     if st.session_state.show_result:
         truth = st.session_state.current_truth
@@ -486,24 +518,24 @@ if not st.session_state.game_over:
 
         st.write("")
 
-        # AI bot emotional reaction
+        # Bot reaction
         if human == truth:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Hurray! You are right on track! 😄🔥 "
+                "🤖 <b>AI Guess Bot:</b> Hurray! You are right on track! 😄🔥 "
                 "That was a great call!"
                 "</div>",
                 unsafe_allow_html=True,
             )
             st.image(
                 random.choice(HAPPY_GIFS),
-                caption="AI Bot is super happy with your answer!",
+                caption="AI Guess Bot is super happy with your answer!",
                 use_container_width=False,
             )
         else:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Aww, not this time 😢 "
+                "🤖 <b>AI Guess Bot:</b> Aww, not this time 😢 "
                 "Either you missed it or the timer got you. "
                 "But don't worry, the next one is yours!"
                 "</div>",
@@ -511,7 +543,7 @@ if not st.session_state.game_over:
             )
             st.image(
                 random.choice(SAD_GIFS),
-                caption="AI Bot is a little sad this round.",
+                caption="AI Guess Bot is a little sad this round.",
                 use_container_width=False,
             )
 
@@ -528,7 +560,7 @@ if not st.session_state.game_over:
                 pick_new_review()
             st.rerun()
 
-# -------------------- PHASE 3: GAME OVER SCREEN -------------------- #
+# ---------- GAME OVER ---------- #
 
 if st.session_state.game_over:
     st.markdown("## 🏁 Game Over")
@@ -537,10 +569,10 @@ if st.session_state.game_over:
     ai_score = st.session_state.ai_score
 
     if human > ai_score:
-        msg = "You beat the AI Bot! 🏆🔥"
+        msg = "You beat the AI Guess Bot! 🏆🔥"
         st.balloons()
     elif human < ai_score:
-        msg = "The AI Bot wins this time… 🤖👑"
+        msg = "The AI Guess Bot wins this time… 🤖👑"
     else:
         msg = "It's a tie! Perfect balance ⚖️"
 
@@ -552,7 +584,6 @@ if st.session_state.game_over:
     )
     st.write("")
 
-    # Winner dance
     if human > ai_score:
         st.markdown(
             "<div class='chat-bubble-human'>"
@@ -568,19 +599,19 @@ if st.session_state.game_over:
     elif human < ai_score:
         st.markdown(
             "<div class='chat-bubble-bot'>"
-            "🤖 <b>AI Bot:</b> I won! Let me show you my dance moves! 💃✨"
+            "🤖 <b>AI Guess Bot:</b> I won! Let me show you my dance moves! 💃✨"
             "</div>",
             unsafe_allow_html=True,
         )
         st.image(
             "https://media.giphy.com/media/26BoCVdjSJOWg6hbi/giphy.gif",
-            caption="AI Bot is dancing in victory!",
+            caption="AI Guess Bot is dancing in victory!",
             use_container_width=False,
         )
     else:
         st.markdown(
             "<div class='chat-bubble-bot'>"
-            "🤖 <b>AI Bot:</b> It's a tie! Let's both dance together 😄"
+            "🤖 <b>AI Guess Bot:</b> It's a tie! Let's both dance together 😄"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -592,21 +623,22 @@ if st.session_state.game_over:
 
     st.write("")
     if st.button("Play Again 🔁", use_container_width=True):
-        # Go back to setup so bot again asks for CSV & rounds from beginning
-        st.session_state.phase = "setup"
-        for key in [
+        # Reset everything and go back to intro (so bot asks again from beginning)
+        keys_to_clear = [
             "df", "round", "total_rounds", "human_score", "ai_score",
             "agreement", "history", "game_over",
             "show_result", "human_guess", "ai_guess",
             "ai_confidence", "current_index",
             "current_review", "current_truth",
-            "round_start_time", "time_up",
-        ]:
+            "round_start_time", "time_up", "time_limit",
+        ]
+        for key in keys_to_clear:
             if key in st.session_state:
                 del st.session_state[key]
+        st.session_state.phase = "intro"
         st.rerun()
 
-# -------------------- HISTORY (OPTIONAL) -------------------- #
+# ---------- HISTORY ---------- #
 
 with st.expander("📊 Round-by-round history (for analysis & grading)"):
     if "history" in st.session_state and st.session_state.history:
