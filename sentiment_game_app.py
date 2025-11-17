@@ -11,7 +11,6 @@ st.set_page_config(
     page_icon="🎯",
 )
 
-# Custom CSS to make UI fun & eye-catching
 st.markdown(
     """
     <style>
@@ -26,6 +25,22 @@ st.markdown(
         font-size: 1.05rem;
         color: #555;
         margin-bottom: 1.2rem;
+    }
+    .chat-bubble-bot {
+        background: #ecf5ff;
+        border-radius: 16px;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.4rem;
+        border: 1px solid #c9ddff;
+        font-size: 0.98rem;
+    }
+    .chat-bubble-human {
+        background: #fff7e6;
+        border-radius: 16px;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.4rem;
+        border: 1px solid #ffe0b3;
+        font-size: 0.98rem;
     }
     .review-card {
         background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
@@ -55,31 +70,24 @@ st.markdown(
 # -------------------- HELPER FUNCTIONS -------------------- #
 
 def normalize_label(label: str) -> str:
-    """
-    Normalize labels like 'pos', 'positive', '4', 'good'
-    into 'Positive', 'Negative', 'Neutral'.
-    """
+    """Normalize various label formats into 'Positive'/'Negative'/'Neutral'."""
     if not isinstance(label, str):
         return "Neutral"
 
     l = label.strip().lower()
 
-    if "pos" in l or l in ("4", "5", "good", "great", "excellent"):
+    if "pos" in l or l in ("4", "5", "good", "great", "excellent", "love", "loved"):
         return "Positive"
-    if "neg" in l or l in ("1", "2", "bad", "terrible", "poor", "awful"):
+    if "neg" in l or l in ("1", "2", "bad", "terrible", "poor", "awful", "worst"):
         return "Negative"
     if "neu" in l or l in ("3", "okay", "ok", "neutral", "average"):
         return "Neutral"
 
-    # Fallback
     return "Neutral"
 
 
 def ai_textblob_sentiment(text: str):
-    """
-    Use TextBlob for simple sentiment.
-    Returns (label, polarity score).
-    """
+    """Use TextBlob for simple sentiment: returns (label, polarity score)."""
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity
 
@@ -94,10 +102,7 @@ def ai_textblob_sentiment(text: str):
 
 
 def pick_new_review(df: pd.DataFrame):
-    """
-    Pick a random review from df and store it in session_state.
-    This implements: Display a random review.
-    """
+    """Pick a random review from df and store in session_state."""
     idx = random.randrange(len(df))
     row = df.iloc[idx]
 
@@ -111,9 +116,7 @@ def pick_new_review(df: pd.DataFrame):
 
 
 def init_game(total_rounds: int):
-    """
-    Initialize a new game: scores, round, history.
-    """
+    """Initialize a new game: scores, round, history."""
     st.session_state.round = 1
     st.session_state.total_rounds = total_rounds
     st.session_state.human_score = 0
@@ -121,6 +124,10 @@ def init_game(total_rounds: int):
     st.session_state.agreement = 0
     st.session_state.history = []
     st.session_state.game_over = False
+    st.session_state.show_result = False
+    st.session_state.human_guess = None
+    st.session_state.ai_guess = None
+    st.session_state.ai_confidence = None
 
 
 # -------------------- SIDEBAR: DATA & SETTINGS -------------------- #
@@ -150,9 +157,9 @@ st.sidebar.write(
     """
     1. Upload a CSV.\n
     2. Hit **Start / Restart Game**.\n
-    3. Read the review.\n
-    4. Guess the sentiment.\n
-    5. See how you compare with the **AI** 🤖!
+    3. 🤖 AI bot shows you a review.\n
+    4. You pick **Positive / Neutral / Negative**.\n
+    5. AI reacts with happy/sad mode & scores update.
     """
 )
 
@@ -165,7 +172,7 @@ if uploaded_file is None:
     )
     st.markdown(
         "<div class='subtitle'>Upload a CSV in the sidebar to begin. "
-        "Make your friends or classmates cheer while you battle the AI!</div>",
+        "Your AI bot host is waiting to quiz you 😎</div>",
         unsafe_allow_html=True,
     )
     st.info("⬅️ Please upload a CSV file to start the game.")
@@ -198,12 +205,12 @@ if "current_review" not in st.session_state:
 # -------------------- HEADER -------------------- #
 
 st.markdown(
-    "<div class='main-title'>Sentiment Guessing Game 🎮 Human vs AI</div>",
+    "<div class='main-title'>Sentiment Guessing Game 🎮 Human vs AI Bot</div>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<div class='subtitle'>Guess the sentiment of real customer reviews and "
-    "see if you can outsmart the AI in front of everyone 😎</div>",
+    "<div class='subtitle'>Your AI bot host will quiz you on real reviews. "
+    "Can you beat the machine? 🤖 vs 🧠</div>",
     unsafe_allow_html=True,
 )
 
@@ -227,88 +234,103 @@ st.progress(progress, text=f"Round {st.session_state.round} of {st.session_state
 
 st.write("")  # spacing
 
-# -------------------- MAIN ROUND UI -------------------- #
+# -------------------- MAIN GAME AREA -------------------- #
 
 if not st.session_state.game_over:
 
-    # 1. Display random review (already selected in session_state)
-    st.markdown("#### 🔍 Read this review")
+    # Chat-style layout
+    st.markdown("### 💬 AI Bot Chat")
+
+    # AI bot introduction text per round
+    st.markdown(
+        "<div class='chat-bubble-bot'>"
+        f"🤖 <b>AI Bot:</b> Round {st.session_state.round}! Here's your review. "
+        "Tell me what <i>you</i> feel about it – Positive, Neutral, or Negative?"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Show review card
     st.markdown(
         f"<div class='review-card'>“{st.session_state.current_review}”</div>",
         unsafe_allow_html=True,
     )
 
     st.write("")
-    st.markdown("#### 🎯 Your Guess")
 
-    # 2. Player selects sentiment
-    guess = st.radio(
-        "What is the sentiment?",
-        ["Positive", "Negative", "Neutral"],
-        key="guess_radio",
-        horizontal=True,
-    )
-
-    col_btn1, col_btn2 = st.columns([2, 1])
-    with col_btn1:
-        submit = st.button("Lock in my guess 🏹", use_container_width=True)
-    with col_btn2:
-        skip = st.button("Skip this review ⏭", use_container_width=True)
-
-    if skip and not st.session_state.show_result:
-        pick_new_review(df)
-        st.rerun()
-
-    # 3. AI predicts sentiment + 4. Reveal true sentiment + 5. Award points
-    if submit and not st.session_state.show_result:
-        st.session_state.human_guess = guess
-
-        # 3. AI model predicts sentiment
-        ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
-        st.session_state.ai_guess = ai_label
-        st.session_state.ai_confidence = ai_conf
-
-        truth = st.session_state.current_truth
-
-        # 5. Award points based on matches
-        human_correct = st.session_state.human_guess == truth
-        ai_correct = st.session_state.ai_guess == truth
-
-        if human_correct:
-            st.session_state.human_score += 1
-        if ai_correct:
-            st.session_state.ai_score += 1
-        if st.session_state.human_guess == st.session_state.ai_guess:
-            st.session_state.agreement += 1
-
-        # History logging
-        st.session_state.history.append(
-            {
-                "round": st.session_state.round,
-                "review": st.session_state.current_review,
-                "truth": truth,
-                "human": st.session_state.human_guess,
-                "ai": st.session_state.ai_guess,
-                "ai_conf": st.session_state.ai_confidence,
-            }
+    # Only show options if result is not yet revealed
+    if not st.session_state.show_result:
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Bot:</b> Choose your answer below 👇"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
-        st.session_state.show_result = True
+        col_p, col_nu, col_ne = st.columns(3)
+        human_choice = None
 
-        # Small celebration when human gets it right and AI is wrong
-        if human_correct and not ai_correct:
-            st.balloons()
+        with col_p:
+            if st.button("😄 Positive", use_container_width=True):
+                human_choice = "Positive"
+        with col_nu:
+            if st.button("😐 Neutral", use_container_width=True):
+                human_choice = "Neutral"
+        with col_ne:
+            if st.button("☹️ Negative", use_container_width=True):
+                human_choice = "Negative"
 
-    # ----- Show round result ----- #
+        # When a choice is made
+        if human_choice is not None:
+            st.session_state.human_guess = human_choice
+
+            # AI predicts
+            ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
+            st.session_state.ai_guess = ai_label
+            st.session_state.ai_confidence = ai_conf
+
+            truth = st.session_state.current_truth
+
+            human_correct = st.session_state.human_guess == truth
+            ai_correct = st.session_state.ai_guess == truth
+
+            # Score updates
+            if human_correct:
+                st.session_state.human_score += 1
+            if ai_correct:
+                st.session_state.ai_score += 1
+            if st.session_state.human_guess == st.session_state.ai_guess:
+                st.session_state.agreement += 1
+
+            # Save history
+            st.session_state.history.append(
+                {
+                    "round": st.session_state.round,
+                    "review": st.session_state.current_review,
+                    "truth": truth,
+                    "human": st.session_state.human_guess,
+                    "ai": st.session_state.ai_guess,
+                    "ai_conf": st.session_state.ai_confidence,
+                }
+            )
+
+            st.session_state.show_result = True
+
+            # Celebration when human correct and AI wrong
+            if human_correct and not ai_correct:
+                st.balloons()
+
+    # ------------- SHOW RESULT (AI reactions, happy/sad) ------------- #
     if st.session_state.show_result:
-        st.write("")
-        st.markdown("### 🧾 Round Result")
-
         truth = st.session_state.current_truth
         human = st.session_state.human_guess
         ai_label = st.session_state.ai_guess
         ai_conf = st.session_state.ai_confidence
 
+        st.write("")
+        st.markdown("### 🧾 Round Result")
+
+        # Human & AI result cards
         col_res1, col_res2 = st.columns(2)
 
         with col_res1:
@@ -316,11 +338,11 @@ if not st.session_state.game_over:
             st.markdown("**✅ Ground Truth Sentiment:**")
             st.write(f"**{truth}**")
             st.markdown("---")
-            st.markdown("**👤 Your Guess:**")
+            st.markdown("**👤 Your Answer:**")
             if human == truth:
                 st.success(f"{human} (Correct!) 🎉")
             else:
-                st.error(f"{human} (Incorrect) 😅")
+                st.error(f"{human} (Oops, not correct) 😅")
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_res2:
@@ -332,18 +354,44 @@ if not st.session_state.game_over:
                 st.warning(f"{ai_label} (Incorrect) 🤔")
             if ai_conf is not None:
                 st.caption(f"AI polarity score: {ai_conf:.3f}")
-            st.markdown("---")
-            if human == ai_label:
-                st.info("You and the AI agreed this round 🧠🧠")
-            else:
-                st.caption("Different brains, different vibes 😄")
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.write("")
 
+        # AI bot emotional reaction (happy/sad)
+        human_correct = human == truth
+        if human_correct:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                "🤖 <b>AI Bot:</b> Hurray! You are right on track! 😄🔥"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.image(
+                "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+                caption="AI Bot is happy with your answer!",
+                use_container_width=False,
+            )
+        else:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                "🤖 <b>AI Bot:</b> Sorry, that's not quite right 😢 "
+                "But don't worry, next one is yours!"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.image(
+                "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",
+                caption="AI Bot feels a little sad this round.",
+                use_container_width=False,
+            )
+
+        st.write("")
+
+        # Next round button
         col_next1, col_next2 = st.columns([2, 1])
         with col_next1:
-            next_btn = st.button("Next Review ➡️", use_container_width=True)
+            next_btn = st.button("Next Question ➡️", use_container_width=True)
 
         if next_btn:
             if st.session_state.round >= st.session_state.total_rounds:
@@ -362,10 +410,10 @@ if st.session_state.game_over:
     ai_score = st.session_state.ai_score
 
     if human > ai_score:
-        msg = "You beat the AI! 🏆🔥"
+        msg = "You beat the AI Bot! 🏆🔥"
         st.balloons()
     elif human < ai_score:
-        msg = "The AI wins this time… 🤖👑"
+        msg = "The AI Bot wins this time… 🤖👑"
     else:
         msg = "It's a tie! Perfect balance ⚖️"
 
@@ -375,6 +423,45 @@ if st.session_state.game_over:
         f"**Final Score:** 👤 Human **{human}** vs 🤖 AI **{ai_score}** · "
         f"Agreement rounds: **{st.session_state.agreement}**"
     )
+    st.write("")
+
+    # Winner dance section
+    if human > ai_score:
+        st.markdown(
+            "<div class='chat-bubble-human'>"
+            "🧑 <b>You:</b> It's my victory dance time! 🕺🎉"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.image(
+            "https://media.giphy.com/media/l41lUJX6ts7fj5Sbm/giphy.gif",
+            caption="Human dances in celebration!",
+            use_container_width=False,
+        )
+    elif human < ai_score:
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Bot:</b> I won! Let me show you my dance moves! 💃✨"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.image(
+            "https://media.giphy.com/media/26BoCVdjSJOWg6hbi/giphy.gif",
+            caption="AI Bot is dancing in victory!",
+            use_container_width=False,
+        )
+    else:
+        st.markdown(
+            "<div class='chat-bubble-bot'>"
+            "🤖 <b>AI Bot:</b> It's a tie! Let's both dance together 😄"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.image(
+            "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
+            caption="Human and AI dancing together!",
+            use_container_width=False,
+        )
 
     st.write("")
     if st.button("Play Again 🔁", use_container_width=True):
