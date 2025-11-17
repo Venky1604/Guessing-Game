@@ -8,21 +8,21 @@ from textblob import TextBlob
 st.set_page_config(
     page_title="Sentiment Guessing Game 🎮",
     layout="wide",
-    page_icon="🎯",
+    page_icon="🤖",
 )
 
 st.markdown(
     """
     <style>
     .main-title {
-        font-size: 2.4rem;
+        font-size: 2.6rem;
         font-weight: 800;
         text-align: center;
         margin-bottom: 0.2rem;
     }
     .subtitle {
         text-align: center;
-        font-size: 1.05rem;
+        font-size: 1.0rem;
         color: #555;
         margin-bottom: 1.2rem;
     }
@@ -49,6 +49,8 @@ st.markdown(
         border: 1px solid #e0e0e0;
         box-shadow: 0 6px 16px rgba(0,0,0,0.06);
         font-size: 1.02rem;
+        margin-top: 0.4rem;
+        margin-bottom: 0.6rem;
     }
     .result-card {
         border-radius: 14px;
@@ -58,8 +60,8 @@ st.markdown(
         box-shadow: 0 4px 12px rgba(0,0,0,0.04);
     }
     .winner-text {
-        font-size: 1.4rem;
-        font-weight: 700;
+        font-size: 1.5rem;
+        font-weight: 750;
         text-align: center;
     }
     </style>
@@ -101,8 +103,9 @@ def ai_textblob_sentiment(text: str):
     return label, polarity
 
 
-def pick_new_review(df: pd.DataFrame):
-    """Pick a random review from df and store in session_state."""
+def pick_new_review():
+    """Pick a random review from stored df and update session_state."""
+    df = st.session_state.df
     idx = random.randrange(len(df))
     row = df.iloc[idx]
 
@@ -116,7 +119,7 @@ def pick_new_review(df: pd.DataFrame):
 
 
 def init_game(total_rounds: int):
-    """Initialize a new game: scores, round, history."""
+    """Initialize a new game: scores, round, history, phase."""
     st.session_state.round = 1
     st.session_state.total_rounds = total_rounds
     st.session_state.human_score = 0
@@ -128,96 +131,121 @@ def init_game(total_rounds: int):
     st.session_state.human_guess = None
     st.session_state.ai_guess = None
     st.session_state.ai_confidence = None
+    st.session_state.phase = "game"  # now we're in game phase
+    pick_new_review()
 
 
-# -------------------- SIDEBAR: DATA & SETTINGS -------------------- #
-
-st.sidebar.header("🎛 Game Setup")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload CSV with `review` and `sentiment` columns",
-    type=["csv"],
-    help="Example columns: review, sentiment (positive/negative/neutral)",
-)
-
-default_rounds = st.sidebar.slider(
-    "Number of rounds",
-    min_value=5,
-    max_value=30,
-    value=10,
-    step=5,
-    help="How many reviews to play this session?",
-)
-
-start_button = st.sidebar.button("🚀 Start / Restart Game")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("ℹ️ How it works")
-st.sidebar.write(
-    """
-    1. Upload a CSV.\n
-    2. Hit **Start / Restart Game**.\n
-    3. 🤖 AI bot shows you a review.\n
-    4. You pick **Positive / Neutral / Negative**.\n
-    5. AI reacts with happy/sad mode & scores update.
-    """
-)
-
-# -------------------- LOAD DATA -------------------- #
-
-if uploaded_file is None:
-    st.markdown(
-        "<div class='main-title'>Sentiment Guessing Game 🎯 vs 🤖</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='subtitle'>Upload a CSV in the sidebar to begin. "
-        "Your AI bot host is waiting to quiz you 😎</div>",
-        unsafe_allow_html=True,
-    )
-    st.info("⬅️ Please upload a CSV file to start the game.")
-    st.stop()
-
-try:
-    df = pd.read_csv(uploaded_file)
-except Exception as e:
-    st.error(f"Could not read CSV: {e}")
-    st.stop()
-
-if "review" not in df.columns or "sentiment" not in df.columns:
-    st.error("CSV must contain `review` and `sentiment` columns.")
-    st.stop()
-
-df = df.dropna(subset=["review", "sentiment"])
-if df.empty:
-    st.error("No valid rows found after dropping missing values.")
-    st.stop()
-
-# -------------------- SESSION STATE INIT -------------------- #
-
-if "round" not in st.session_state or start_button:
-    init_game(default_rounds)
-    pick_new_review(df)
-
-if "current_review" not in st.session_state:
-    pick_new_review(df)
-
-# -------------------- HEADER -------------------- #
+# -------------------- INITIAL HEADER -------------------- #
 
 st.markdown(
-    "<div class='main-title'>Sentiment Guessing Game 🎮 Human vs AI Bot</div>",
+    "<div class='main-title'>Sentiment Guessing Game 🤖🆚🧠</div>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<div class='subtitle'>Your AI bot host will quiz you on real reviews. "
-    "Can you beat the machine? 🤖 vs 🧠</div>",
+    "<div class='subtitle'>An AI bot host will quiz you on real reviews. "
+    "Upload a dataset and see if you can beat the machine!</div>",
     unsafe_allow_html=True,
 )
+st.write("")
 
-# -------------------- SCOREBOARD -------------------- #
+# Initialize phase
+if "phase" not in st.session_state:
+    st.session_state.phase = "setup"
 
+# -------------------- PHASE 1: SETUP (AI bot asks to upload CSV) -------------------- #
+
+if st.session_state.phase == "setup":
+    # AI bot greeting
+    st.markdown(
+        "<div class='chat-bubble-bot'>"
+        "🤖 <b>AI Bot:</b> Hey there! I'm your Sentiment Quiz Bot. "
+        "To start the game, please upload a CSV file with customer reviews.<br>"
+        "<br><b>Required columns:</b> <code>review</code> and <code>sentiment</code> "
+        "(e.g., positive / negative / neutral)."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    uploaded_file = st.file_uploader(
+        "Upload your review dataset CSV here 👇",
+        type=["csv"],
+    )
+
+    st.markdown(
+        "<div class='chat-bubble-bot'>"
+        "🤖 <b>AI Bot:</b> Also, how many questions do you want me to ask you?"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    rounds = st.slider(
+        "Select number of rounds:",
+        min_value=5,
+        max_value=30,
+        value=10,
+        step=5,
+    )
+
+    start = st.button("🚀 Start Game with this file", use_container_width=True)
+
+    if start:
+        if uploaded_file is None:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                "🤖 <b>AI Bot:</b> Oops! I can't see any file yet 😅 "
+                "Please upload a CSV so I can read the reviews."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.stop()
+        try:
+            df = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                f"🤖 <b>AI Bot:</b> I tried to read the file but ran into an error: "
+                f"<code>{e}</code><br>"
+                "Can you check the file and try again?"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.stop()
+
+        if "review" not in df.columns or "sentiment" not in df.columns:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                "🤖 <b>AI Bot:</b> Hmmm... your file is missing the required "
+                "<code>review</code> and/or <code>sentiment</code> columns 😢<br>"
+                "Please fix the columns and upload again."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.stop()
+
+        df = df.dropna(subset=["review", "sentiment"])
+        if df.empty:
+            st.markdown(
+                "<div class='chat-bubble-bot'>"
+                "🤖 <b>AI Bot:</b> After cleaning, I found no valid rows in your file. "
+                "Please try with another dataset."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.stop()
+
+        # Store df and start game
+        st.session_state.df = df
+        init_game(rounds)
+        st.rerun()
+
+    st.stop()  # stop here in setup phase
+
+# -------------------- FROM HERE: WE ARE IN GAME PHASE -------------------- #
+
+df = st.session_state.df  # loaded in setup
+
+# Scoreboard on top
 col_score1, col_score2, col_score3 = st.columns(3)
-
 with col_score1:
     st.metric("👤 Human Score", st.session_state.human_score)
 with col_score2:
@@ -226,43 +254,41 @@ with col_score3:
     st.metric(
         "🧠 Human & AI Agreement",
         st.session_state.agreement,
-        help="Number of rounds where you and the AI picked the same label.",
+        help="Number of rounds where you and the AI picked the same sentiment.",
     )
 
 progress = st.session_state.round / st.session_state.total_rounds
 st.progress(progress, text=f"Round {st.session_state.round} of {st.session_state.total_rounds}")
 
-st.write("")  # spacing
+st.write("")
 
-# -------------------- MAIN GAME AREA -------------------- #
+# -------------------- PHASE 2: GAME LOOP -------------------- #
 
 if not st.session_state.game_over:
 
-    # Chat-style layout
     st.markdown("### 💬 AI Bot Chat")
 
-    # AI bot introduction text per round
+    # Bot introduces the question
     st.markdown(
         "<div class='chat-bubble-bot'>"
-        f"🤖 <b>AI Bot:</b> Round {st.session_state.round}! Here's your review. "
-        "Tell me what <i>you</i> feel about it – Positive, Neutral, or Negative?"
+        f"🤖 <b>AI Bot:</b> Okay, Round <b>{st.session_state.round}</b>! "
+        "Read this review carefully and tell me its sentiment 👇"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # Show review card
+    # Show review
     st.markdown(
         f"<div class='review-card'>“{st.session_state.current_review}”</div>",
         unsafe_allow_html=True,
     )
 
-    st.write("")
-
-    # Only show options if result is not yet revealed
+    # If we haven't shown result yet, ask for answer
     if not st.session_state.show_result:
         st.markdown(
             "<div class='chat-bubble-bot'>"
-            "🤖 <b>AI Bot:</b> Choose your answer below 👇"
+            "🤖 <b>AI Bot:</b> What do you think this review feels like?"
+            " Click one of the options below:"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -280,11 +306,10 @@ if not st.session_state.game_over:
             if st.button("☹️ Negative", use_container_width=True):
                 human_choice = "Negative"
 
-        # When a choice is made
         if human_choice is not None:
             st.session_state.human_guess = human_choice
 
-            # AI predicts
+            # AI prediction
             ai_label, ai_conf = ai_textblob_sentiment(st.session_state.current_review)
             st.session_state.ai_guess = ai_label
             st.session_state.ai_confidence = ai_conf
@@ -294,7 +319,6 @@ if not st.session_state.game_over:
             human_correct = st.session_state.human_guess == truth
             ai_correct = st.session_state.ai_guess == truth
 
-            # Score updates
             if human_correct:
                 st.session_state.human_score += 1
             if ai_correct:
@@ -302,7 +326,6 @@ if not st.session_state.game_over:
             if st.session_state.human_guess == st.session_state.ai_guess:
                 st.session_state.agreement += 1
 
-            # Save history
             st.session_state.history.append(
                 {
                     "round": st.session_state.round,
@@ -316,11 +339,12 @@ if not st.session_state.game_over:
 
             st.session_state.show_result = True
 
-            # Celebration when human correct and AI wrong
+            # Fun balloons when human correct and AI wrong
             if human_correct and not ai_correct:
                 st.balloons()
 
-    # ------------- SHOW RESULT (AI reactions, happy/sad) ------------- #
+    # -------------------- SHOW RESULT AFTER CHOICE -------------------- #
+
     if st.session_state.show_result:
         truth = st.session_state.current_truth
         human = st.session_state.human_guess
@@ -330,9 +354,7 @@ if not st.session_state.game_over:
         st.write("")
         st.markdown("### 🧾 Round Result")
 
-        # Human & AI result cards
         col_res1, col_res2 = st.columns(2)
-
         with col_res1:
             st.markdown("<div class='result-card'>", unsafe_allow_html=True)
             st.markdown("**✅ Ground Truth Sentiment:**")
@@ -342,7 +364,7 @@ if not st.session_state.game_over:
             if human == truth:
                 st.success(f"{human} (Correct!) 🎉")
             else:
-                st.error(f"{human} (Oops, not correct) 😅")
+                st.error(f"{human} (Incorrect) 😅")
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_res2:
@@ -358,37 +380,35 @@ if not st.session_state.game_over:
 
         st.write("")
 
-        # AI bot emotional reaction (happy/sad)
-        human_correct = human == truth
-        if human_correct:
+        # AI bot emotional reaction
+        if human == truth:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Hurray! You are right on track! 😄🔥"
+                "🤖 <b>AI Bot:</b> Hurray! You are right on track! 😄🔥 "
+                "That was a great call!"
                 "</div>",
                 unsafe_allow_html=True,
             )
             st.image(
                 "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
-                caption="AI Bot is happy with your answer!",
+                caption="AI Bot is super happy with your answer!",
                 use_container_width=False,
             )
         else:
             st.markdown(
                 "<div class='chat-bubble-bot'>"
-                "🤖 <b>AI Bot:</b> Sorry, that's not quite right 😢 "
-                "But don't worry, next one is yours!"
+                "🤖 <b>AI Bot:</b> Aww, not this time 😢 But don't worry, "
+                "we'll nail the next one!"
                 "</div>",
                 unsafe_allow_html=True,
             )
             st.image(
                 "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",
-                caption="AI Bot feels a little sad this round.",
+                caption="AI Bot is a little sad this round.",
                 use_container_width=False,
             )
 
         st.write("")
-
-        # Next round button
         col_next1, col_next2 = st.columns([2, 1])
         with col_next1:
             next_btn = st.button("Next Question ➡️", use_container_width=True)
@@ -398,10 +418,10 @@ if not st.session_state.game_over:
                 st.session_state.game_over = True
             else:
                 st.session_state.round += 1
-                pick_new_review(df)
+                pick_new_review()
             st.rerun()
 
-# -------------------- GAME OVER SCREEN -------------------- #
+# -------------------- PHASE 3: GAME OVER SCREEN -------------------- #
 
 if st.session_state.game_over:
     st.markdown("## 🏁 Game Over")
@@ -425,11 +445,11 @@ if st.session_state.game_over:
     )
     st.write("")
 
-    # Winner dance section
+    # Winner dance
     if human > ai_score:
         st.markdown(
             "<div class='chat-bubble-human'>"
-            "🧑 <b>You:</b> It's my victory dance time! 🕺🎉"
+            "🧑 <b>You:</b> Time for my victory dance! 🕺🎉"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -465,14 +485,21 @@ if st.session_state.game_over:
 
     st.write("")
     if st.button("Play Again 🔁", use_container_width=True):
-        init_game(default_rounds)
-        pick_new_review(df)
+        # Go back to setup so bot again asks for CSV & rounds from beginning
+        st.session_state.phase = "setup"
+        for key in ["df", "round", "total_rounds", "human_score", "ai_score",
+                    "agreement", "history", "game_over",
+                    "show_result", "human_guess", "ai_guess",
+                    "ai_confidence", "current_index",
+                    "current_review", "current_truth"]:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
 
-# -------------------- HISTORY (OPTIONAL ANALYTICS) -------------------- #
+# -------------------- HISTORY (OPTIONAL) -------------------- #
 
 with st.expander("📊 Round-by-round history (for analysis & grading)"):
-    if st.session_state.history:
+    if "history" in st.session_state and st.session_state.history:
         hist_df = pd.DataFrame(st.session_state.history)
         hist_df_display = hist_df[
             ["round", "truth", "human", "ai", "ai_conf"]
